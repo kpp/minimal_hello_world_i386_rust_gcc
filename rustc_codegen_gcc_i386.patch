@@ -1,0 +1,97 @@
+diff --git a/config.sh b/config.sh
+index b25e215..18574f2 100644
+--- a/config.sh
++++ b/config.sh
+@@ -20,8 +20,9 @@ else
+ fi
+ 
+ HOST_TRIPLE=$(rustc -vV | grep host | cut -d: -f2 | tr -d " ")
+-TARGET_TRIPLE=$HOST_TRIPLE
++#TARGET_TRIPLE=$HOST_TRIPLE
+ #TARGET_TRIPLE="m68k-unknown-linux-gnu"
++TARGET_TRIPLE="i686-unknown-linux-gnu"
+ 
+ linker=''
+ RUN_WRAPPER=''
+@@ -33,6 +34,8 @@ if [[ "$HOST_TRIPLE" != "$TARGET_TRIPLE" ]]; then
+       # We are cross-compiling for aarch64. Use the correct linker and run tests in qemu.
+       linker='-Clinker=aarch64-linux-gnu-gcc'
+       RUN_WRAPPER='qemu-aarch64 -L /usr/aarch64-linux-gnu'
++   elif [[ "$TARGET_TRIPLE" == "i686-unknown-linux-gnu" ]]; then
++      : # do nothing
+    else
+       echo "Unknown non-native platform"
+    fi
+diff --git a/src/back/write.rs b/src/back/write.rs
+index efcf18d..e640fbe 100644
+--- a/src/back/write.rs
++++ b/src/back/write.rs
+@@ -14,6 +14,8 @@ pub(crate) unsafe fn codegen(cgcx: &CodegenContext<GccCodegenBackend>, _diag_han
+     let _timer = cgcx.prof.generic_activity_with_arg("LLVM_module_codegen", &*module.name);
+     {
+         let context = &module.module_llvm.context;
++        context.add_command_line_option("-m32");
++        context.add_driver_option("-m32");
+ 
+         let module_name = module.name.clone();
+         let module_name = Some(&module_name[..]);
+diff --git a/src/base.rs b/src/base.rs
+index 8cc9581..fb8bd88 100644
+--- a/src/base.rs
++++ b/src/base.rs
+@@ -98,7 +98,7 @@ pub fn compile_codegen_unit<'tcx>(tcx: TyCtxt<'tcx>, cgu_name: Symbol, supports_
+         context.add_command_line_option("-mpclmul");
+         context.add_command_line_option("-mfma");
+         context.add_command_line_option("-mfma4");
+-        context.add_command_line_option("-m64");
++        context.add_command_line_option("-m32");
+         context.add_command_line_option("-mbmi");
+         context.add_command_line_option("-mgfni");
+         context.add_command_line_option("-mavxvnni");
+diff --git a/src/context.rs b/src/context.rs
+index 2699559..056352a 100644
+--- a/src/context.rs
++++ b/src/context.rs
+@@ -161,13 +161,13 @@ impl<'gcc, 'tcx> CodegenCx<'gcc, 'tcx> {
+         let ulonglong_type = context.new_c_type(CType::ULongLong);
+         let sizet_type = context.new_c_type(CType::SizeT);
+ 
+-        let isize_type = context.new_c_type(CType::LongLong);
+-        let usize_type = context.new_c_type(CType::ULongLong);
++        let isize_type = context.new_c_type(CType::Int);
++        let usize_type = context.new_c_type(CType::UInt);
+         let bool_type = context.new_type::<bool>();
+ 
+         // TODO(antoyo): only have those assertions on x86_64.
+-        assert_eq!(isize_type.get_size(), i64_type.get_size());
+-        assert_eq!(usize_type.get_size(), u64_type.get_size());
++        assert_eq!(isize_type.get_size(), i32_type.get_size());
++        assert_eq!(usize_type.get_size(), u32_type.get_size());
+ 
+         let mut functions = FxHashMap::default();
+         let builtins = [
+diff --git a/src/int.rs b/src/int.rs
+index 0c5dab0..5fd4925 100644
+--- a/src/int.rs
++++ b/src/int.rs
+@@ -524,7 +524,7 @@ impl<'a, 'gcc, 'tcx> Builder<'a, 'gcc, 'tcx> {
+         // when having proper sized integer types.
+         let param_type = bswap.get_param(0).to_rvalue().get_type();
+         if param_type != arg_type {
+-            arg = self.bitcast(arg, param_type);
++            arg = self.cx.context.new_cast(None, arg, param_type);
+         }
+         self.cx.context.new_call(None, bswap, &[arg])
+     }
+diff --git a/src/lib.rs b/src/lib.rs
+index e43ee5c..8fb5823 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -104,6 +104,7 @@ impl CodegenBackend for GccCodegenBackend {
+         let temp_dir = TempDir::new().expect("cannot create temporary directory");
+         let temp_file = temp_dir.into_path().join("result.asm");
+         let check_context = Context::default();
++        check_context.add_command_line_option("-m32");
+         check_context.set_print_errors_to_stderr(false);
+         let _int128_ty = check_context.new_c_type(CType::UInt128t);
+         // NOTE: we cannot just call compile() as this would require other files than libgccjit.so.

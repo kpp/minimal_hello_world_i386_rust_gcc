@@ -1,0 +1,37 @@
+diff --git a/src/base.rs b/src/base.rs
+index fb8bd88..d5268dc 100644
+--- a/src/base.rs
++++ b/src/base.rs
+@@ -87,29 +87,11 @@ pub fn compile_codegen_unit<'tcx>(tcx: TyCtxt<'tcx>, cgu_name: Symbol, supports_
+         // Instantiate monomorphizations without filling out definitions yet...
+         //let llvm_module = ModuleLlvm::new(tcx, &cgu_name.as_str());
+         let context = Context::default();
+-        // TODO(antoyo): only set on x86 platforms.
+         context.add_command_line_option("-masm=intel");
+-        // TODO(antoyo): only add the following cli argument if the feature is supported.
+-        context.add_command_line_option("-msse2");
+-        context.add_command_line_option("-mavx2");
+-        // FIXME(antoyo): the following causes an illegal instruction on vmovdqu64 in std_example on my CPU.
+-        // Only add if the CPU supports it.
+-        context.add_command_line_option("-msha");
+-        context.add_command_line_option("-mpclmul");
+-        context.add_command_line_option("-mfma");
+-        context.add_command_line_option("-mfma4");
+         context.add_command_line_option("-m32");
+-        context.add_command_line_option("-mbmi");
+-        context.add_command_line_option("-mgfni");
+-        context.add_command_line_option("-mavxvnni");
+-        context.add_command_line_option("-mf16c");
+-        context.add_command_line_option("-maes");
+-        context.add_command_line_option("-mxsavec");
+-        context.add_command_line_option("-mbmi2");
+-        context.add_command_line_option("-mrtm");
+-        context.add_command_line_option("-mvaes");
+-        context.add_command_line_option("-mvpclmulqdq");
+-        context.add_command_line_option("-mavx");
++        context.add_command_line_option("-fno-pic");
++        context.add_command_line_option("-fno-asynchronous-unwind-tables");
++        context.add_command_line_option("-Os");
+ 
+         for arg in &tcx.sess.opts.cg.llvm_args {
+             context.add_command_line_option(arg);
